@@ -93,6 +93,15 @@ end
 #   - if you have > strength than it, then eat it
 #   - otherwise, wait until your strength is >
 # - if you are surrounded by your squares, move N or E
+
+# OPTIMIZATIONS:
+# - have a list of min targets so only one piece is waiting to capture another
+#   if you have an L around a square
+#   - how will this work when adjacent to an enemy square?
+# - move inner pieces toward border that is closest to it (dynamic programming)
+# - move toward high productive zones (are there clusters?)
+# - or, more radially outward from center
+# - re-write in go
 def get_target(map, loc)
   owned = nil
   owned_min = 1000
@@ -100,7 +109,7 @@ def get_target(map, loc)
     new_loc = map.find_location(loc, l)
     site = map.site(new_loc)
     if site.owner != $tag && site.strength < owned_min
-      owned_min = owned_min
+      owned_min = site.strength
       owned = l
     end
   end
@@ -122,7 +131,9 @@ def simple()
 
         if target == nil || target.empty?
           options = GameMap::CARDINALS
-          moves << Move.new(loc, options.shuffle.first)
+          if site.strength > 5*site.production
+            moves << Move.new(loc, $directions.shuffle.first)
+          end
         else
           target_loc = map.site(map.find_location(loc, target))
           if target_loc.strength < site.strength
