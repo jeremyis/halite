@@ -95,6 +95,11 @@ end
 # - if you are surrounded by your squares, move N or E
 
 # OPTIMIZATIONS:
+# - compute the center-of-mass and have your guys move away from it
+#   there are two vectors you can move in, use some secondary selection
+#   to determine which vector (random or weighted random according to vector?)
+# - weigh the center-of-mass according to strength of dudes since the
+#   weaker side will be having more trouble.
 # - have a list of min targets so only one piece is waiting to capture another
 #   if you have an L around a square
 #   - how will this work when adjacent to an enemy square?
