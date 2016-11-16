@@ -4,6 +4,11 @@ require 'networking'
 $network = Networking.new("ElBotGrande")
 $tag, map = $network.configure
 
+$NORTH = GameMap::CARDINALS[0]
+$EAST = GameMap::CARDINALS[1]
+$SOUTH = GameMap::CARDINALS[2]
+$WEST = GameMap::CARDINALS[3]
+
 $directions = [ GameMap::CARDINALS[0], GameMap::CARDINALS[1] ]
 def valid_moves(map, loc)
   moves = []
@@ -107,6 +112,8 @@ end
 # - move toward high productive zones (are there clusters?)
 # - or, more radially outward from center
 # - re-write in go
+
+# Return adjacent square with min strength.
 def get_target(map, loc)
   owned = nil
   owned_min = 1000
@@ -121,32 +128,99 @@ def get_target(map, loc)
   owned
 end
 
+def find_pieces(map)
+  pieces = []
+  (0...map.height).each do |y|
+    (0...map.width).each do |x|
+      loc = Location.new(x, y)
+      site = map.site(loc)
+      pieces << loc if site.owner == $tag
+    end
+  end
+  return pieces
+end
+
+# the center will be closer to the area with more strength; so the
+# weaker side will need more help. we'll send pieces away from the center
+# and there will be more pieces on the weaker side.
+def compute_weighted_center_of_mass(map, pieces)
+  #cx = (x0*w0 + x1*w1 + ... + xn*wn) / (w0 + w1 + ... wn)
+  total_weight = 0
+  cx = 0
+  cy = 0
+  pieces.each do |loc|
+    site = map.site(loc)
+    total_weight += site.strength
+    cx += loc.x*site.strength
+    cy += loc.y*site.strength
+  end
+  return [cx / total_weight, cy / total_weight]
+end
+
 def simple()
   while true
     moves = []
     map = $network.frame
+    pieces = find_pieces(map)
+    cx, cy = compute_weighted_center_of_mass(map, pieces)
+    File.open('debug.log', 'a') { |file| file.write([cx, cy,"\n"].join(" ")) }
 
-    (0...map.height).each do |y|
-      (0...map.width).each do |x|
-        loc = Location.new(x, y)
-        site = map.site(loc)
+    pieces.each do |loc|
+      site = map.site(loc)
 
-        next if site.owner != $tag
-        target = get_target(map, loc)
+      target = get_target(map, loc)
 
-        if target == nil || target.empty?
-          options = GameMap::CARDINALS
-          if site.strength > 5*site.production
-            moves << Move.new(loc, $directions.shuffle.first)
-          end
-        else
-          target_loc = map.site(map.find_location(loc, target))
-          if target_loc.strength < site.strength
-            moves << Move.new(loc, target)
-          end
+      # All adjacent squares are controlled by this bot, so move away
+      # from the center of mass.
+      if target == nil || target.empty?
+
+        options = []
+        x_diff = loc.x - cx
+        if x_diff > 0
+          options << $EAST
+        elsif x_diff < 0
+          options << $WEST
         end
 
+        # Y gets bigger going down.
+        y_diff = loc.y - cy
+        if y_diff > 0
+          options << $SOUTH
+        elsif y_diff < 0
+          options << $NORTH
+        end
+
+=begin
+        File.open('debug.log', 'a') { |file|
+          file.write(['diff', x_diff, y_diff,"\n"].join(" "))
+          file.write(([ ['diff_options'] + options, "\n"]).join(" "))
+          file.write(([ ['allOptions'] + GameMap::CARDINALS, "\n"]).join(" "))
+          file.write((['EAST', $EAST, "\n"].join(" ")))
+        }
+=end
+        # TODO: next OPTIMIZATION: don't let big guys eat other guys. Just make sure
+        # there are no collisions.
+
+        # TODO: would be cool to weigh the direction you go in based off
+        # how far offset you are respectfully (e.g. if you're almost
+        # vertically aligned with COM you want to mostly move vertically
+        # away). Do this with weighted probability
+
+        # TODO: what about when we wrap around the map? :(
+
+        if site.strength > 5*site.production
+          options = options.empty? ? GameMap::CARDINALS : options
+          moves << Move.new(loc, options.shuffle.first)
+        end
+
+      # Move toward minimum adjacent square as long as we can take it.
+      else
+        target_loc = map.site(map.find_location(loc, target))
+        if target_loc.strength < site.strength
+          moves << Move.new(loc, target)
+        end
       end
+
     end
 
     $network.send_moves(moves)
