@@ -1,8 +1,8 @@
 $:.unshift(File.dirname(__FILE__))
 require 'networking'
 
-network = Networking.new("ElBotGrande")
-$tag, map = network.configure
+$network = Networking.new("ElBotGrande")
+$tag, map = $network.configure
 
 $directions = [ GameMap::CARDINALS[0], GameMap::CARDINALS[1] ]
 def valid_moves(map, loc)
@@ -34,32 +34,34 @@ end
 # Hash of piece to move and
 #directions
 
-while true
-  moves = []
-  map = network.frame
+def primary()
+  while true
+    moves = []
+    map = $network.frame
 
-  (0...map.height).each do |y|
-    (0...map.width).each do |x|
-      loc = Location.new(x, y)
-      site = map.site(loc)
+    (0...map.height).each do |y|
+      (0...map.width).each do |x|
+        loc = Location.new(x, y)
+        site = map.site(loc)
 
-      next if site.owner != $tag
+        next if site.owner != $tag
 
-      next if should_wait(map, site)
+        next if should_wait(map, site)
 
-      valid = valid_moves(map, loc)
-      if valid.empty?
-        opts = $directions
-        #opts = site.strength == 255 ? directions : ([GameMap::DIRECTIONS[0] ] +  directions
-        moves << Move.new(loc, opts.shuffle.first)
-      else
-        moves << Move.new(loc, valid.shuffle.first)
+        valid = valid_moves(map, loc)
+        if valid.empty?
+          opts = $directions
+          #opts = site.strength == 255 ? directions : ([GameMap::DIRECTIONS[0] ] +  directions
+          moves << Move.new(loc, opts.shuffle.first)
+        else
+          moves << Move.new(loc, valid.shuffle.first)
+        end
+
       end
-
     end
-  end
 
-  network.send_moves(moves)
+    $network.send_moves(moves)
+  end
 end
 
 # good algorithm
@@ -84,3 +86,51 @@ end
 # - if there are multiple pieces assigned to that square, we assign them to the
 # other square. if those are taken, we have the weakest wait.
 # - don't attack a square unless you are stronger
+#primary()
+
+# other simple strategy:
+# - if there is an unowned adjacent square:
+#   - if you have > strength than it, then eat it
+#   - otherwise, wait until your strength is >
+# - if you are surrounded by your squares, move N or E
+def get_target(map, loc)
+  GameMap::CARDINALS.each do |l|
+    new_loc = map.find_location(loc, l)
+    site = map.site(new_loc)
+    if site.owner != $tag
+      return l
+    end
+  end
+end
+
+def simple()
+  while true
+    moves = []
+    map = $network.frame
+
+    (0...map.height).each do |y|
+      (0...map.width).each do |x|
+        loc = Location.new(x, y)
+        site = map.site(loc)
+
+        next if site.owner != $tag
+        target = get_target(map, loc)
+
+        if target.empty?
+          options = GameMap::CARDINALS
+          moves << Move.new(loc, options.shuffle.first)
+        else
+          target_loc = map.site(map.find_location(loc, target))
+          if target_loc.strength < site.strength
+            moves << Move.new(loc, target)
+          end
+        end
+
+      end
+    end
+
+    $network.send_moves(moves)
+  end
+end
+
+simple()
