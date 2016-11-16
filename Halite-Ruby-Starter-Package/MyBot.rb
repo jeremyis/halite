@@ -94,13 +94,17 @@ end
 #   - otherwise, wait until your strength is >
 # - if you are surrounded by your squares, move N or E
 def get_target(map, loc)
+  owned = nil
+  owned_min = 1000
   GameMap::CARDINALS.each do |l|
     new_loc = map.find_location(loc, l)
     site = map.site(new_loc)
-    if site.owner != $tag
-      return l
+    if site.owner != $tag && site.strength < owned_min
+      owned_min = owned_min
+      owned = l
     end
   end
+  owned
 end
 
 def simple()
@@ -116,7 +120,7 @@ def simple()
         next if site.owner != $tag
         target = get_target(map, loc)
 
-        if target.empty?
+        if target == nil || target.empty?
           options = GameMap::CARDINALS
           moves << Move.new(loc, options.shuffle.first)
         else
