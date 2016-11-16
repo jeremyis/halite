@@ -4,9 +4,11 @@ require 'networking'
 network = Networking.new("ElBotGrande")
 $tag, map = network.configure
 
+$directions = [ GameMap::CARDINALS[0], GameMap::CARDINALS[1] ]
 def valid_moves(map, loc)
   moves = []
-  GameMap::CARDINALS.each do |l|
+  #GameMap::CARDINALS.each do |l|
+  $directions.each do |l|
     new_loc = map.find_location(loc, l)
     site = map.site(new_loc)
     if site.owner != $tag
@@ -29,6 +31,9 @@ def should_wait(map, site)
   return false
 end
 
+# Hash of piece to move and
+#directions
+
 while true
   moves = []
   map = network.frame
@@ -44,7 +49,8 @@ while true
 
       valid = valid_moves(map, loc)
       if valid.empty?
-        opts = site.strength == 255 ? GameMap::CARDINALS : GameMap::DIRECTIONS
+        opts = $directions
+        #opts = site.strength == 255 ? directions : ([GameMap::DIRECTIONS[0] ] +  directions
         moves << Move.new(loc, opts.shuffle.first)
       else
         moves << Move.new(loc, valid.shuffle.first)
